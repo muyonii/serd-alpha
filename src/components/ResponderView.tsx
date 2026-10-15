@@ -268,7 +268,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  // Comms & Messages State
  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
  const [unreadCount, setUnreadCount] = useState(0);
- const [incomingMessageBanner, setIncomingMessageBanner] = useState<{ id: string; senderName: string; text: string; timestamp: string; chatId?: string } | null>(null);
  const [messageInput, setMessageInput] = useState('');
  const [messages, setMessages] = useState<IncidentChatMessage[]>([]);
 
@@ -510,9 +509,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  });
  if (!isMessagesOpenRef.current) {
  setUnreadCount(c => c + 1);
- setIncomingMessageBanner(data.message);
  playChime(880, 1174.66);
- setTimeout(() => setIncomingMessageBanner(null), 6000);
  }
  });
 
@@ -535,14 +532,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  playChime(880, 1174.66);
  if (!isMessagesOpenRef.current || activeChatIdRef.current !== data.chatId) {
  setUnreadCount(c => c + 1);
- setIncomingMessageBanner({
- id:'toast-' + Date.now(),
- senderName: data.message.senderName ||'Citizen',
- text: data.message.text,
- timestamp: data.message.timestamp,
- chatId: data.chatId
- });
- setTimeout(() => setIncomingMessageBanner(null), 6000);
  }
  }
  }
@@ -690,13 +679,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  const top = chats[0];
  // If newest message is from a citizen and the responder doesn't have this chat open, notify
  if (top.lastMessageSender !== callSign && (!isMessagesOpenRef.current || activeChatIdRef.current !== top.id)) {
- setIncomingMessageBanner({
- id:'toast-' + Date.now(),
- senderName: top.citizenName,
- text: top.lastMessage,
- timestamp: top.lastMessageTime,
- chatId: top.id
- });
  setUnreadCount(c => c + 1);
  playChime(880, 1174.66);
  }
@@ -956,20 +938,15 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  };
 
  const handleOpenMessages = () => {
- if (incomingMessageBanner?.chatId) {
- setActiveChatId(incomingMessageBanner.chatId);
- const chat = directChats.find(c => c.id === incomingMessageBanner.chatId);
- if (chat) {
+ if (directChats.length === 1) {
+ const chat = directChats[0];
+ setActiveChatId(chat.id);
  setActiveChatRecipient({ id: chat.citizenId, name: chat.citizenName, type:'citizen', apparatus: chat.responderApparatus });
- } else {
- setActiveChatRecipient({ id:'citizen', name: incomingMessageBanner.senderName, type:'citizen' });
- }
  } else {
  setActiveChatId(null);
  }
  setIsMessagesOpen(true);
  setUnreadCount(0);
- setIncomingMessageBanner(null);
  };
 
  // Active map focal point
@@ -1123,38 +1100,13 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  >
  <MessageSquare className="w-5 h-5 text-neutral-800 dark:text-white" />
  {unreadCount > 0 && (
- <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+ <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
  {unreadCount}
  </span>
  )}
  </button>
  </div>
  </div>
-
- {/* Floating Incoming Message Banner Toast */}
- {incomingMessageBanner && !isMessagesOpen && (
- <div 
- onClick={handleOpenMessages}
- className="absolute top-16 right-3 sm:right-4 z-30 max-w-sm bg-neutral-900/95 dark:bg-neutral-900/95 text-white rounded-2xl p-3 shadow-xl border border-neutral-800 backdrop-blur-md animate-[fade-in_0.2s_ease-out] cursor-pointer flex items-center gap-3 transition-transform active:scale-[0.99]"
- >
- <div className="w-8 h-8 rounded-xl bg-[#B41A46]/20 text-[#B41A46] dark:text-rose-400 flex items-center justify-center shrink-0 border border-[#B41A46]/30">
- <MessageSquare className="w-4 h-4" />
- </div>
- <div className="flex-1 min-w-0 pr-1">
- <div className="flex items-center justify-between gap-2">
- <span className="text-[11px] font-semibold text-white truncate">
- {incomingMessageBanner.senderName}
- </span>
- <span className="text-[10px] text-neutral-400 shrink-0">
- {incomingMessageBanner.timestamp}
- </span>
- </div>
- <p className="text-xs text-neutral-300 truncate mt-0.5">
- {incomingMessageBanner.text}
- </p>
- </div>
- </div>
- )}
 
  {/* Mode: EN ROUTE - Real-time Turn Navigation HUD */}
  {(mode ==='en_route' || mode ==='transporting') && routeResult && (
@@ -1195,15 +1147,9 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
 
  <div className="flex items-center justify-between mb-3">
  <div>
- <div className="flex items-center space-x-2">
- <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
  <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
- {callSign} &bull; On Standby
+ {callSign}
  </h2>
- </div>
- <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
- {isGpsActive ?`Live GPS Connected (±${gpsAccuracy}m)` :'Connected to Emergency Response Network'}
- </p>
  </div>
 
  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-lg border ${
@@ -1235,7 +1181,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
 
  {liveIncidents.length === 0 ? (
  <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-xl border border-neutral-100 dark:border-neutral-800 text-center">
- <p className="text-xs text-neutral-500 dark:text-neutral-400">No active incidents in queue &bull; Unit standing by</p>
+ <p className="text-xs text-neutral-500 dark:text-neutral-400">No active incidents in queue</p>
  </div>
  ) : (
  <div className="space-y-1.5 max-h-36 overflow-y-auto">
@@ -1386,10 +1332,15 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  <div className="flex items-center gap-2">
  <button
  onClick={handleOpenMessages}
- className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white flex items-center justify-center transition-colors cursor-pointer"
+ className="relative w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white flex items-center justify-center transition-colors cursor-pointer"
  title="Message Citizen / Dispatch"
  >
  <MessageSquare className="w-4 h-4" />
+ {unreadCount > 0 && (
+ <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[#B41A46] text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+ {unreadCount}
+ </span>
+ )}
  </button>
 
  <a
@@ -1800,73 +1751,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
  <X className="w-4 h-4" />
  </button>
  </div>
- </div>
-
- {/* Quick Presets Bar */}
- <div className="px-3 py-2 bg-neutral-50 dark:bg-neutral-800/60 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center gap-1.5 overflow-x-auto shrink-0 no-scrollbar">
- {activeChatRecipient?.type ==='citizen' ? (
- <>
- <button
- type="button"
- onClick={() => handleSendMessage('Copy that, en route to your position')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- En route
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('Unit has arrived outside your location')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- Arrived outside
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('Please remain in a safe location until unit makes contact')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- Stay safe
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('What is your exact gate code or building entrance?')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- Gate code?
- </button>
- </>
- ) : (
- <>
- <button
- type="button"
- onClick={() => handleSendMessage('10-4 Copy that, standing by')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- 10-4 Copy
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('Backing you up, moving to your sector')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- Backing up
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('Arrived on scene, assessing area')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- On scene
- </button>
- <button
- type="button"
- onClick={() => handleSendMessage('All clear on scene, resuming patrol')}
- className="px-2.5 py-1 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
- >
- All clear
- </button>
- </>
- )}
  </div>
 
  {/* Messages Stream */}

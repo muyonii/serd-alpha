@@ -249,7 +249,6 @@ export default function MapScreen({
 
   const [messages, setMessages] = useState<IncidentChatMessage[]>([]);
   const [unreadMsgCount, setUnreadMsgCount] = useState<number>(0);
-  const [incomingMsgToast, setIncomingMsgToast] = useState<IncidentChatMessage | null>(null);
   const [dispatchStatusToast, setDispatchStatusToast] = useState<{
     type: 'accepted' | 'reassigned' | 'alert';
     message: string;
@@ -296,13 +295,6 @@ export default function MapScreen({
       if (msgs.length > 0) {
         const latest = msgs[msgs.length - 1];
         if (latest.senderRole === 'responder' && !showMessageModal) {
-          setIncomingMsgToast({
-            id: latest.id,
-            sender: 'responder',
-            senderName: latest.senderName,
-            text: latest.text,
-            timestamp: latest.timestamp
-          });
           setUnreadMsgCount(c => c + 1);
           playChime(880, 1174.66);
         }
@@ -747,9 +739,7 @@ export default function MapScreen({
         });
         if (data.message.sender !== 'citizen') {
           playChime(880, 1174.66);
-          setIncomingMsgToast(data.message);
           setUnreadMsgCount(c => c + 1);
-          setTimeout(() => setIncomingMsgToast(null), 6000);
         }
       }
     });
@@ -763,15 +753,7 @@ export default function MapScreen({
         });
         if (data.message.senderRole !== 'citizen' && !showMessageModal) {
           playChime(880, 1174.66);
-          setIncomingMsgToast({
-            id: data.message.id,
-            sender: 'responder',
-            senderName: data.message.senderName,
-            text: data.message.text,
-            timestamp: data.message.timestamp
-          });
           setUnreadMsgCount(c => c + 1);
-          setTimeout(() => setIncomingMsgToast(null), 6000);
         }
       }
     });
@@ -921,7 +903,34 @@ export default function MapScreen({
       </div>
 
       {/* Top Floating Action Bar */}
-      <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 flex items-center justify-end pointer-events-none">
+      <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 flex items-center justify-end gap-2.5 pointer-events-none">
+        {/* Messages & Patrol Comms Icon Button */}
+        <button
+          onClick={() => {
+            if (activeTargetResponder) {
+              setUnreadMsgCount(0);
+              setShowMessageModal(true);
+            } else if (onlineResponders.length > 0) {
+              setSelectedResponder(onlineResponders[0]);
+              setUnreadMsgCount(0);
+              setShowMessageModal(true);
+            } else {
+              setSelectionNotice('Select an active patrol unit from the map to open direct radio messaging.');
+              setTimeout(() => setSelectionNotice(null), 4000);
+            }
+          }}
+          className="pointer-events-auto relative w-10 h-10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white cursor-pointer active:scale-95 transition-all"
+          aria-label="Messages"
+          title="Direct Radio Messages"
+        >
+          <MessageSquare className="w-5 h-5 text-neutral-800 dark:text-white" />
+          {unreadMsgCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
+              {unreadMsgCount}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={requestLocation}
           className="pointer-events-auto w-10 h-10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white cursor-pointer active:scale-95 transition-all"
@@ -1208,7 +1217,7 @@ export default function MapScreen({
                 : 'NO PATROL ONLINE'}
             </span>
             {unreadMsgCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
                 {unreadMsgCount}
               </span>
             )}
@@ -1224,34 +1233,6 @@ export default function MapScreen({
             <span>{selectionNotice}</span>
           </div>
           <button onClick={() => setSelectionNotice(null)} className="ml-2 font-bold px-1.5 py-0.5 rounded active:bg-amber-600">✕</button>
-        </div>
-      )}
-
-      {/* Floating Incoming Message Toast from Responder */}
-      {incomingMsgToast && !showMessageModal && (
-        <div 
-          onClick={() => {
-            setUnreadMsgCount(0);
-            setShowMessageModal(true);
-          }}
-          className="absolute top-4 left-4 right-4 z-40 bg-neutral-900/95 dark:bg-neutral-900/95 text-white rounded-2xl p-3 shadow-xl border border-neutral-800 backdrop-blur-md animate-[fade-in_0.2s_ease-out] cursor-pointer flex items-center gap-3 transition-transform active:scale-[0.99]"
-        >
-          <div className="w-8 h-8 rounded-xl bg-[#B41A46]/20 text-[#B41A46] dark:text-rose-400 flex items-center justify-center shrink-0 border border-[#B41A46]/30">
-            <MessageSquare className="w-4 h-4" />
-          </div>
-          <div className="flex-1 min-w-0 pr-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-white truncate">
-                {incomingMsgToast.senderName}
-              </span>
-              <span className="text-[10px] text-neutral-400 shrink-0">
-                {incomingMsgToast.timestamp}
-              </span>
-            </div>
-            <p className="text-xs text-neutral-300 truncate mt-0.5">
-              {incomingMsgToast.text}
-            </p>
-          </div>
         </div>
       )}
 
@@ -1349,38 +1330,6 @@ export default function MapScreen({
                   );
                 })
               )}
-            </div>
-
-            {/* Minimal Quick Action Chips */}
-            <div className="px-3 py-2 border-t border-neutral-100 dark:border-neutral-800/80 bg-white dark:bg-neutral-900 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-              <button
-                type="button"
-                onClick={() => setChatMessage('Standing by the front gate in visible clothing')}
-                className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 border border-transparent whitespace-nowrap transition-colors cursor-pointer active:scale-95 shrink-0"
-              >
-                At front gate
-              </button>
-              <button
-                type="button"
-                onClick={() => setChatMessage('Patient is conscious and breathing steadily')}
-                className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 border border-transparent whitespace-nowrap transition-colors cursor-pointer active:scale-95 shrink-0"
-              >
-                Breathing stable
-              </button>
-              <button
-                type="button"
-                onClick={() => setChatMessage('Gate code is: ')}
-                className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 border border-transparent whitespace-nowrap transition-colors cursor-pointer active:scale-95 shrink-0"
-              >
-                Gate code
-              </button>
-              <button
-                type="button"
-                onClick={() => setChatMessage('Condition worsened, need urgent assistance')}
-                className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 border border-transparent whitespace-nowrap transition-colors cursor-pointer active:scale-95 shrink-0"
-              >
-                Condition worsened
-              </button>
             </div>
 
             {/* Minimal Composer */}
